@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PS Algo V3 — Advanced Paper Trading</title>
+<style>
+:root{color-scheme:dark;--bg:#08111f;--panel:#101d30;--line:#263b56;--text:#edf4ff;--muted:#9bb0ca;--green:#27c281;--red:#ff657a;--blue:#69a9ff;--gold:#ffc857}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:18px 16px;border-bottom:1px solid var(--line);font-size:22px;font-weight:850}header span{color:var(--blue)}
+main{max-width:980px;margin:auto;padding:14px}.notice{background:#302713;border:1px solid #70572a;color:#ffe1a0;padding:12px;border-radius:12px;font-size:13px;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}.metric small,.muted{color:var(--muted)}.metric strong{display:block;font-size:21px;margin-top:7px;overflow-wrap:anywhere}.positive{color:var(--green)}.negative{color:var(--red)}
+h2{font-size:16px;margin:0 0 12px}.fields{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+input,select{width:100%;background:#081522;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px;font-size:15px}
+button{border:0;border-radius:9px;padding:12px 15px;font-weight:750;background:var(--blue);color:#071322;margin:8px 6px 0 0}button.secondary{background:#263b56;color:var(--text)}button.danger{background:#5b2632;color:white}button:disabled{opacity:.4}
+.price{font-size:30px;font-weight:800;margin:8px 0}.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}.status{border-radius:20px;padding:5px 9px;background:#263b56}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted)}
+#log{max-height:190px;overflow:auto;color:var(--muted);font-size:13px;line-height:1.6}.logline{padding:4px 0;border-bottom:1px solid var(--line)}.hint{font-size:12px;color:var(--muted);line-height:1.45}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.metric strong{font-size:18px}}
+</style></head><body>
+<header><span>PS</span> ALGO <small style="font-size:12px;color:var(--muted)">V3 · ADVANCED RISK</small></header>
+<main>
+<div class="notice"><b>DEMO / PAPER MODE ONLY.</b> Prices are randomly generated sample prices, not live market data. This app is not connected to Dhan or any broker and cannot place real orders. Do not enter API keys, passwords or OTPs. This is a learning simulator, not investment advice.</div>
+<div class="grid">
+<div class="card metric"><small>Paper balance</small><strong id="bal">₹100,000</strong></div>
+<div class="card metric"><small>Equity</small><strong id="equity">₹100,000</strong></div>
+<div class="card metric"><small>Today's realized P&amp;L</small><strong id="daypnl">₹0</strong></div>
+<div class="card metric"><small>Open P&amp;L</small><strong id="unreal">₹0</strong></div>
+</div>
+<div class="grid">
+<div class="card metric"><small>Trades today</small><strong id="tradeCount">0 / 3</strong></div>
+<div class="card metric"><small>Daily loss used</small><strong id="lossUsed">₹0</strong></div>
+<div class="card metric"><small>Daily loss limit</small><strong id="lossLimitView">₹2,000</strong></div>
+<div class="card metric"><small>Bot status</small><strong id="statusText">STOPPED</strong></div>
+</div>
+<div class="card"><div class="row"><h2>Market simulator</h2><span class="status" id="status">STOPPED</span></div>
+<div class="price" id="price">₹100.00</div><div class="row"><span id="symbol">DEMO-EQUITY · SIMULATED</span><span id="ticks">0 ticks</span></div>
+<button id="start">Start paper bot</button><button class="secondary" id="pause" disabled>Pause</button><button class="danger" id="reset">Reset demo</button></div>
+<div class="card"><h2>Strategy &amp; risk settings</h2><div class="fields">
+<div class="field"><label>Demo instrument</label><select id="instrument"><option>DEMO-EQUITY</option><option>DEMO-USD</option><option>DEMO-GOLD</option></select></div>
+<div class="field"><label>Starting paper balance (₹)</label><input id="starting" type="number" min="1000" step="1000" value="100000"></div>
+<div class="field"><label>Fast EMA</label><input id="fast" type="number" min="2" max="50" value="9"></div>
+<div class="field"><label>Slow EMA</label><input id="slow" type="number" min="3" max="100" value="21"></div>
+<div class="field"><label>Risk per trade (%)</label><input id="risk" type="number" min="0.1" max="2" step="0.1" value="0.5"></div>
+<div class="field"><label>Stop loss (%)</label><input id="sl" type="number" min="0.1" max="10" step="0.1" value="1"></div>
+<div class="field"><label>Take profit (%)</label><input id="tp" type="number" min="0.1" max="20" step="0.1" value="2"></div>
+<div class="field"><label>Maximum trades per day</label><input id="maxTrades" type="number" min="1" max="20" value="3"></div>
+<div class="field"><label>Daily loss limit (₹)</label><input id="dailyLimit" type="number" min="100" step="100" value="2000"></div>
+<div class="field"><label>Daily profit target (₹, 0 = off)</label><input id="dailyTarget" type="number" min="0" step="100" value="3000"></div>
+</div><p class="hint">EMA crossover · one open position at a time · position size is calculated from risk and stop distance. Daily stop checks realized P&amp;L plus current open P&amp;L. Limits are session-only in this browser; refreshing or closing the page resets the demo.</p></div>
+<div class="card"><h2>Open paper position</h2><div id="position" class="muted">No open position</div><button class="danger" id="close" disabled>Close position</button></div>
+<div class="card"><h2>Today's paper trade history</h2><div class="tablewrap"><table><thead><tr><th>Time</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Reason</th></tr></thead><tbody id="history"><tr><td colspan="7">No trades yet</td></tr></tbody></table></div></div>
+<div class="card"><h2>Activity log</h2><div id="log">Ready. Start the simulator to generate sample prices.</div></div>
+</main><footer>PS Algo V3 · Browser-only paper simulator · No broker integration</footer>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+let running=false,timer=null,price=100,series=[],position=null,trades=[],balance=100000,realized=0,ticks=0,sessionTrades=0,lastSignal='',haltReason='';
+const cash=n=>'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:2}),stamp=()=>new Date().toLocaleTimeString();
+function cfg(){return{fast:+$('fast').value,slow:+$('slow').value,risk:+$('risk').value/100,sl:+$('sl').value/100,tp:+$('tp').value/100,max:Math.max(1,+$('maxTrades').value||1),loss:Math.max(100,+$('dailyLimit').value||2000),target:Math.max(0,+$('dailyTarget').value||0)}}
+function log(s){let d=document.createElement('div');d.className='logline';d.textContent=stamp()+' — '+s;$('log').prepend(d)}
+function ema(a,n){if(a.length<n)return null;let k=2/(n+1),v=a.slice(0,n).reduce((x,y)=>x+y,0)/n;for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);return v}
+function openPnl(){return position?(price-position.entry)*position.qty*(position.side==='BUY'?1:-1):0}
+function dayNet(){return realized+openPnl()}
+function stopCheck(){let c=cfg();if(dayNet()<=-c.loss){halt('Daily loss limit reached');return true}if(c.target>0&&dayNet()>=c.target){halt('Daily profit target reached');return true}if(sessionTrades>=c.max&&!position){halt('Maximum trades reached');return true}return false}
+function halt(reason){running=false;clearInterval(timer);timer=null;haltReason=reason;log('BOT AUTO-STOPPED: '+reason);render()}
+function render(){let c=cfg();$('bal').textContent=cash(balance);$('equity').textContent=cash(balance+openPnl());$('daypnl').textContent=cash(realized);$('daypnl').className=realized>=0?'positive':'negative';$('unreal').textContent=cash(openPnl());$('unreal').className=openPnl()>=0?'positive':'negative';$('tradeCount').textContent=sessionTrades+' / '+c.max;$('lossUsed').textContent=cash(Math.max(0,-Math.min(0,dayNet())));$('lossLimitView').textContent=cash(c.loss);$('status').textContent=running?'RUNNING':(haltReason?'AUTO-STOPPED':'STOPPED');$('statusText').textContent=running?'RUNNING':(haltReason?'AUTO-STOP':'STOPPED');$('start').disabled=running;$('pause').disabled=!running;$('price').textContent=cash(price);$('symbol').textContent=$('instrument').value+' · SIMULATED';$('ticks').textContent=ticks+' ticks';$('close').disabled=!position;$('position').textContent=position?`${position.side} · Entry ${position.entry.toFixed(2)} · Qty ${position.qty} · SL ${position.stop.toFixed(2)} · TP ${position.target.toFixed(2)} · Open P&L ${cash(openPnl())}`:'No open position';$('history').innerHTML=trades.length?trades.slice().reverse().map(t=>`<tr><td>${t.time}</td><td>${t.side}</td><td>${t.entry.toFixed(2)}</td><td>${t.exit.toFixed(2)}</td><td>${t.qty}</td><td class="${t.pnl>=0?'positive':'negative'}">${cash(t.pnl)}</td><td>${t.reason}</td></tr>`).join(''):'<tr><td colspan="7">No trades yet</td></tr>'}
+function open(side){let c=cfg(),stopDistance=price*c.sl,riskCash=(balance+openPnl())*c.risk,qty=Math.floor(riskCash/stopDistance);if(qty<1){log('Trade skipped: calculated quantity below 1');return}position={side,entry:price,qty,stop:price*(side==='BUY'?1-c.sl:1+c.sl),target:price*(side==='BUY'?1+c.tp:1-c.tp)};sessionTrades++;log(side+' paper position opened at '+price.toFixed(2)+' · qty '+qty)}
+function close(reason){if(!position)return;let p=position,profit=(price-p.entry)*p.qty*(p.side==='BUY'?1:-1);balance+=profit;realized+=profit;trades.push({time:stamp(),side:p.side,entry:p.entry,exit:price,qty:p.qty,pnl:profit,reason});log(p.side+' closed: '+reason+' · P&L '+cash(profit));position=null}
+function step(){price=Math.max(1,price+(Math.random()-.49)*.75);ticks++;series.push(price);if(series.length>250)series.shift();let c=cfg();if(position){if((position.side==='BUY'&&price<=position.stop)||(position.side==='SELL'&&price>=position.stop))close('Stop loss');else if((position.side==='BUY'&&price>=position.target)||(position.side==='SELL'&&price<=position.target))close('Take profit')}
+if(stopCheck()){render();return}
+if(!position){let f=ema(series,c.fast),s=ema(series,c.slow);if(f!==null&&s!==null){let signal=f>s?'BUY':'SELL';if(signal!==lastSignal){open(signal);lastSignal=signal}}}
+if(stopCheck()){render();return}render()}
+$('start').onclick=()=>{let c=cfg();if(c.fast>=c.slow){log('Settings error: Fast EMA must be smaller than Slow EMA');return}if(c.sl<=0||c.tp<=0||c.risk<=0){log('Settings error: risk, stop loss and take profit must be above zero');return}if(dayNet()<=-c.loss||(c.target>0&&dayNet()>=c.target)||sessionTrades>=c.max){log('Cannot start: a daily limit has already been reached. Reset demo to begin a fresh test session.');return}haltReason='';running=true;timer=setInterval(step,1500);log('Paper simulator started. Generated prices only; not live data.');render()};
+$('pause').onclick=()=>{running=false;clearInterval(timer);timer=null;log('Simulator paused manually');render()};
+$('close').onclick=()=>{close('Manual close');render()};
+$('reset').onclick=()=>{if(running){log('Pause the bot before resetting');return}clearInterval(timer);position=null;trades=[];series=[];ticks=0;sessionTrades=0;lastSignal='';haltReason='';price=100;balance=Math.max(1000,+$('starting').value||100000);realized=0;$('log').textContent='Demo reset. Ready for a fresh paper session.';render()};
+$('instrument').onchange=render;render();
+})();
+</script></body></html>
