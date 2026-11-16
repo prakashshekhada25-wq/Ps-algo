@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PS Algo — Mobile Paper Trading</title>
+<style>
+:root{color-scheme:dark;--bg:#08111f;--panel:#111e31;--line:#263950;--muted:#9aabc0;--blue:#65b5ff;--green:#35d49a;--red:#ff7188}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#eef5ff;font:15px system-ui,-apple-system,Arial}
+header{padding:18px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#08111fee;backdrop-filter:blur(12px)}
+.logo{font-size:22px;font-weight:850;letter-spacing:2px}.pill{font-size:10px;color:#ffd27b;border:1px solid #795a25;border-radius:20px;padding:6px 9px;font-weight:800}
+main{max-width:760px;margin:auto;padding:14px}.warning{background:#302713;border:1px solid #72551e;color:#ffdc91;border-radius:10px;padding:12px;font-size:12px;line-height:1.5;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:10px}
+small,.muted{color:var(--muted)}.metric strong{display:block;font-size:22px;margin-top:8px;overflow-wrap:anywhere}
+h2{font-size:15px;margin:0 0 12px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{border:0;border-radius:9px;padding:12px 14px;font-weight:800;font-size:14px;cursor:pointer;flex:1}
+.start{background:var(--green);color:#05271c}.stop{background:var(--red);color:#310711}.secondary{background:#34465f;color:white}
+input{width:82px;background:#08111f;color:white;border:1px solid var(--line);padding:9px;border-radius:7px}
+canvas{width:100%;height:170px;display:block}.positive{color:var(--green)}.negative{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:500px}td,th{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted)}
+.tablewrap{overflow:auto}.pos{font-size:13px;line-height:1.8}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
+</style></head><body>
+<header><div class="logo">PS ALGO</div><div class="pill">PAPER ONLY · V1</div></header>
+<main>
+<div class="warning"><b>Simulation only:</b> this app generates random test prices. It is not connected to Dhan or any broker and does not send real orders. Keep this page open while the paper bot runs.</div>
+<div class="grid">
+ <div class="card metric"><small>Virtual Equity</small><strong id="equity">₹1,00,000.00</strong></div>
+ <div class="card metric"><small>Available Cash</small><strong id="cash">₹1,00,000.00</strong></div>
+ <div class="card metric"><small>Paper P&amp;L</small><strong id="pnl">₹0.00</strong></div>
+ <div class="card metric"><small>Test Price</small><strong id="price">₹1,000.00</strong></div>
+</div>
+<div class="card"><h2>Simulated Price Chart</h2><canvas id="chart"></canvas><small id="lasttick">Waiting for test tick…</small></div>
+<div class="card"><h2>Bot Control</h2><p>State: <b id="state">STOPPED</b> &nbsp; Signal: <b id="signal">WAIT</b></p>
+<div class="row"><button class="start" id="start">Start Paper Bot</button><button class="stop" id="stop">Stop Bot</button><button class="secondary" id="reset">Reset</button></div></div>
+<div class="card"><h2>Risk Settings</h2><div class="row">
+<label>SL % <input id="sl" type="number" min=".1" max="5" step=".1" value="1"></label>
+<label>Target % <input id="tp" type="number" min=".1" max="10" step=".1" value="2"></label>
+<label>Max trades/day <input id="max" type="number" min="1" max="10" value="3"></label>
+</div><p><button class="secondary" id="save">Save Settings</button></p><small id="msg">EMA 9/21 · Max 3 trades/day · Simulated random walk</small></div>
+<div class="card"><h2>Open Position</h2><div id="position" class="muted">No open position</div></div>
+<div class="card"><h2>Recent Paper Trades</h2><div class="tablewrap"><table><thead><tr><th>Time</th><th>Side</th><th>Qty</th><th>Entry</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead><tbody id="trades"><tr><td colspan="7">No trades yet</td></tr></tbody></table></div></div>
+<footer>PS Algo V1 · Mobile prototype · Simulation only</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id),fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+let cash=100000,price=1000,prices=Array(30).fill(1000),position=null,trades=[],running=false,timer=null,dayCount=0,day=new Date().toDateString(),signal='WAIT',sl=1,tp=2,maxTrades=3;
+function ema(a,p){if(a.length<p)return null;let k=2/(p+1),v=a.slice(0,p).reduce((x,y)=>x+y,0)/p;for(let i=p;i<a.length;i++)v=a[i]*k+v*(1-k);return v}
+function close(reason){let pnl=(price-position.entry)*position.qty;cash+=position.entry*position.qty+pnl;trades.unshift({time:new Date().toLocaleTimeString(),side:'SELL',qty:position.qty,entry:position.entry,price,pnl,reason});position=null}
+function tick(){
+ if(new Date().toDateString()!==day){day=new Date().toDateString();dayCount=0}
+ price=Math.max(1,price*(1+(Math.random()-.5)*.0036));prices.push(price);if(prices.length>100)prices.shift();
+ if(position){if(price<=position.stop)close('Stop loss');else if(price>=position.target)close('Target')}
+ else {let f=ema(prices,9),s=ema(prices,21);signal=f!==null&&s!==null&&f>s?'BUY':'WAIT';
+ if(signal==='BUY'&&dayCount<maxTrades){let qty=Math.min(Math.floor((cash*.01)/(price*sl/100)),Math.floor(cash/price));if(qty>0){cash-=price*qty;position={entry:price,qty,stop:price*(1-sl/100),target:price*(1+tp/100)};dayCount++;trades.unshift({time:new Date().toLocaleTimeString(),side:'BUY',qty,entry:price,price,pnl:0,reason:'EMA 9/21 paper entry'})}}}
+ render()
+}
+function render(){
+ let unreal=position?(price-position.entry)*position.qty:0,equity=cash+(position?position.qty*price:0);
+ $('equity').textContent=fmt(equity);$('cash').textContent=fmt(cash);$('pnl').textContent=fmt(equity-100000);$('pnl').className=equity>=100000?'positive':'negative';$('price').textContent=fmt(price);
+ $('state').textContent=running?'RUNNING':'STOPPED';$('state').className=running?'positive':'negative';$('signal').textContent=signal;$('lasttick').textContent='Last simulated tick: '+new Date().toLocaleTimeString();
+ $('position').innerHTML=position?`BUY ${position.qty} units<br>Entry: ${fmt(position.entry)} · SL: ${fmt(position.stop)} · Target: ${fmt(position.target)}<br>Unrealized P&amp;L: ${fmt(unreal)}`:'No open position';
+ $('trades').innerHTML=trades.length?trades.slice(0,25).map(t=>`<tr><td>${t.time}</td><td>${t.side}</td><td>${t.qty}</td><td>${fmt(t.entry)}</td><td>${fmt(t.price)}</td><td class="${t.pnl>=0?'positive':'negative'}">${fmt(t.pnl)}</td><td>${t.reason}</td></tr>`).join(''):'<tr><td colspan="7">No trades yet</td></tr>';
+ draw()
+}
+function draw(){let c=$('chart'),ctx=c.getContext('2d'),w=c.clientWidth,h=170,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);let mn=Math.min(...prices),mx=Math.max(...prices),rg=mx-mn||1;ctx.beginPath();prices.forEach((v,i)=>{let x=i/(prices.length-1)*w,y=h-8-(v-mn)/rg*(h-16);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle='#65b5ff';ctx.lineWidth=2;ctx.stroke()}
+$('start').onclick=()=>{if(!running){running=true;timer=setInterval(tick,1000);render();$('msg').textContent='Paper bot running. Test prices only.'}};
+$('stop').onclick=()=>{running=false;clearInterval(timer);render();$('msg').textContent='Paper bot stopped.'};
+$('reset').onclick=()=>{running=false;clearInterval(timer);cash=100000;price=1000;prices=Array(30).fill(1000);position=null;trades=[];dayCount=0;signal='WAIT';render();$('msg').textContent='Paper account reset.'};
+$('save').onclick=()=>{if(running){$('msg').textContent='Stop the bot before changing settings.';return}sl=Math.max(.1,Math.min(5,Number($('sl').value)||1));tp=Math.max(.1,Math.min(10,Number($('tp').value)||2));maxTrades=Math.max(1,Math.min(10,Math.floor(Number($('max').value)||3)));$('msg').textContent='Settings saved: SL '+sl+'%, target '+tp+'%, max '+maxTrades+' trades/day.'};
+render();window.addEventListener('resize',draw);
+</script></body></html>
